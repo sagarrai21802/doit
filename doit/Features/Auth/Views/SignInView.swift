@@ -1,12 +1,16 @@
 import SwiftUI
 
 struct SignInView: View {
+    @StateObject private var userManager = UserManager.shared
     @State private var phoneNumber: String = ""
-    @State private var showOTP = false
+    @State private var isLoading = false
+    @State private var showError = false
+    @State private var errorMessage = ""
+    @State private var showHome = false
     
     var body: some View {
-        if showOTP {
-            OTPVerificationView(phoneNumber: phoneNumber)
+        if showHome || userManager.isLoggedIn {
+            HomeView()
         } else {
             ZStack {
                 AppColors.primaryBackground.ignoresSafeArea()
@@ -17,7 +21,7 @@ struct SignInView: View {
                             .font(AppFonts.header)
                             .foregroundColor(AppColors.primaryText)
                         
-                        Text("We will send you a confirmation code to log in.")
+                        Text("We will create your account or log you in.")
                             .font(AppFonts.body)
                             .foregroundColor(AppColors.secondaryText)
                     }
@@ -30,19 +34,52 @@ struct SignInView: View {
                             text: $phoneNumber,
                             keyboardType: .phonePad
                         )
+                        
+                        if showError {
+                            Text(errorMessage)
+                                .font(AppFonts.caption)
+                                .foregroundColor(.red)
+                        }
                     }
                     .padding(.top, 20)
                     
                     Spacer()
                     
-                    PrimaryButton(title: "Continue") {
-                        if !phoneNumber.isEmpty {
-                            withAnimation { showOTP = true }
-                        }
+                    PrimaryButton(title: "Continue", isLoading: isLoading) {
+                        registerUser()
                     }
                     .padding(.bottom, 20)
                 }
                 .padding(.horizontal)
+            }
+        }
+    }
+    
+    private func registerUser() {
+        guard phoneNumber.count >= 10 else {
+            showError = true
+            errorMessage = "Please enter a valid phone number"
+            return
+        }
+        
+        isLoading = true
+        showError = false
+        
+        NetworkService.shared.registerUser(phoneNumber: phoneNumber) { result in
+            DispatchQueue.main.async {
+                isLoading = false
+                
+                switch result {
+                case .success(let user):
+                    print("✅ User registered: \(user.id)")
+                    userManager.login(user: user)
+                    showHome = true
+                    
+                case .failure(let error):
+                    print("❌ Registration failed: \(error)")
+                    showError = true
+                    errorMessage = "Connection failed. Is the server running?"
+                }
             }
         }
     }
