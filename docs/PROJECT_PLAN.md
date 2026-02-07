@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**DoIt** is a goal-tracking application designed to help users stay focused and achieve their goals through structured daily tasks, AI-generated roadmaps, streak-based motivation, and anonymous community support. The UI follows a chat-based paradigm similar to WhatsApp/ChatGPT, where each "chat" represents an individual goal with its own dedicated conversation, roadmap, and progress tracking.
+**DoIt** is a goal-tracking application designed to help users stay focused and achieve their goals through structured daily tasks, AI-generated roadmaps, streak-based motivation, daily verification tests to ensure genuine learning, and anonymous community support. The UI follows a chat-based paradigm similar to WhatsApp/ChatGPT, where each "chat" represents an individual goal with its own dedicated conversation, roadmap, and progress tracking.
 
 ---
 
@@ -14,6 +14,7 @@ The fundamental problem this app solves: **People set goals but get distracted d
 2. Providing AI-researched roadmaps based on successful achievers
 3. Creating accountability through streak systems
 4. Connecting users anonymously with others pursuing similar goals
+5. Verifying daily task completion through AI-generated tests to ensure genuine learning
 
 ---
 
@@ -207,11 +208,14 @@ Display to user
 4. Text input appears: "Tell us what you accomplished today"
 5. User describes their work (free-form text)
 6. AI provides encouraging response (not stored, just displayed)
-7. Streak updated if check-in completed
+7. **Verification test triggered** (see Section 7: Daily Task Verification System)
+8. User completes verification test to validate task completion
+9. Streak updated if check-in and verification both completed
 
 **Streak Logic:**
-- ✅ Check-in done → Streak +1
+- ✅ Check-in + Verification passed → Streak +1
 - ❌ No check-in → Streak reset to 0
+- ❌ Verification failed → Streak paused, retry allowed
 - 🔔 User can inform about miss → Roadmap adjusts, streak maintains with "rest day"
 
 ---
@@ -255,6 +259,121 @@ Display to user
 - Overall progress percentage
 - Roadmap visualization (calendar view)
 - Next upcoming task
+- Verification score (average test performance)
+- Today's verification status (pending/passed/failed)
+
+---
+
+### 7. Daily Task Verification System
+
+**Concept:** At the end of each day, users must complete a verification test to confirm they've actually completed their assigned daily tasks. This ensures accountability and validates progress.
+
+**Verification Flow:**
+
+1. **Trigger**
+   - User completes daily check-in (free-form text description)
+   - System detects all tasks for the day are marked as complete
+   - Verification prompt appears: "Let's verify your learning today!"
+
+2. **Test Generation** (AI-Powered)
+   - AI analyzes the day's completed tasks
+   - Generates 3-5 relevant questions based on tasks
+   - Questions vary by task type:
+     - **Coding tasks**: Code completion, debugging, concept questions
+     - **Reading tasks**: Multiple choice, short answer, key concepts
+     - **Practice tasks**: Scenario-based questions, application problems
+     - **Video tasks**: Key takeaways, main concepts, implementation details
+
+3. **Test Interface**
+   - Clean, distraction-free quiz interface
+   - One question at a time
+   - Multiple choice or short answer format
+   - Time limit: 5-10 minutes total
+   - Progress indicator
+
+4. **Scoring & Feedback**
+   - **Pass threshold**: 70% correct answers
+   - **Pass**: Tasks marked as verified, streak maintained, progress updated
+   - **Fail**: User can retry once (different questions), or mark as "needs review"
+   - **Detailed feedback**: Show correct answers with explanations
+
+5. **Adaptive Difficulty**
+   - If user consistently scores high → Increase question difficulty
+   - If user struggles → Provide hints, easier questions, or suggest review
+   - Track performance over time to adjust roadmap pacing
+
+**Example Test Structure:**
+```json
+{
+  "goal_id": "uuid",
+  "day": 5,
+  "date": "2026-01-17",
+  "verification_test": {
+    "test_id": "uuid",
+    "questions": [
+      {
+        "id": 1,
+        "type": "multiple_choice",
+        "question": "What is the correct syntax to create a list in Python?",
+        "options": [
+          "list = [1, 2, 3]",
+          "list = (1, 2, 3)",
+          "list = {1, 2, 3}",
+          "list = <1, 2, 3>"
+        ],
+        "correct_answer": 0,
+        "explanation": "Lists in Python are created using square brackets []"
+      },
+      {
+        "id": 2,
+        "type": "code_completion",
+        "question": "Complete the following code to print 'Hello World':",
+        "code_snippet": "print(______)",
+        "correct_answer": "'Hello World'",
+        "explanation": "The print() function outputs text to the console"
+      },
+      {
+        "id": 3,
+        "type": "short_answer",
+        "question": "What does the len() function do in Python?",
+        "correct_answer": "Returns the length of an object",
+        "explanation": "len() returns the number of items in a container"
+      }
+    ],
+    "pass_threshold": 0.7,
+    "time_limit_minutes": 10
+  },
+  "user_response": {
+    "answers": [0, "'Hello World'", "Returns the length"],
+    "score": 1.0,
+    "passed": true,
+    "completed_at": "2026-01-17T20:30:00Z"
+  }
+}
+```
+
+**Verification States:**
+| State | Description | Streak Impact |
+|-------|-------------|---------------|
+| **Pending** | Test not yet taken | Streak paused |
+| **Passed** | Score ≥ 70% | Streak +1 |
+| **Failed - Retry** | Score < 70%, first attempt | Streak paused, one retry allowed |
+| **Failed - Review** | Score < 70%, retry failed | Streak reset, tasks marked for review |
+| **Skipped** | User chose to skip | Streak reset, tasks marked incomplete |
+
+**Benefits:**
+- ✅ Ensures genuine learning, not just task checking
+- ✅ Provides immediate feedback on understanding
+- ✅ Helps identify knowledge gaps early
+- ✅ Increases accountability and motivation
+- ✅ Data for AI to personalize future roadmaps
+- ✅ Gamification element (achievements for perfect scores)
+
+**Edge Cases & Handling:**
+- **User genuinely busy**: Can mark as "rest day" (streak maintained, tasks rescheduled)
+- **Technical issues**: Can request manual review by AI
+- **Multiple goals**: Verification per goal, not per day
+- **Review mode**: Failed tasks appear in next day's tasks with additional resources
 
 ---
 
@@ -289,7 +408,24 @@ Display to user
   ],
   "streak": 5,
   "last_checkin": "2026-01-12",
-  "status": "active" // active, completed, paused
+  "status": "active", // active, completed, paused
+  "daily_verifications": [
+    {
+      "date": "2026-01-17",
+      "test_id": "uuid",
+      "questions_count": 3,
+      "score": 1.0,
+      "passed": true,
+      "completed_at": "2026-01-17T20:30:00Z"
+    }
+  ],
+  "verification_stats": {
+    "total_tests": 15,
+    "passed": 14,
+    "failed": 1,
+    "average_score": 0.85,
+    "perfect_scores": 8
+  }
 }
 ```
 
@@ -350,6 +486,7 @@ Display to user
 4. Daily Task View
 5. Dashboard View
 6. Profile/Settings Screen
+7. Verification Test Screen (quiz interface for daily task validation)
 
 ---
 
@@ -377,6 +514,10 @@ DELETE /goals/{id}
 
 POST   /goals/{id}/checkin
 GET    /goals/{id}/roadmap
+
+POST   /goals/{id}/verification/generate
+POST   /goals/{id}/verification/submit
+GET    /goals/{id}/verification/stats
 ```
 
 ---
@@ -397,6 +538,8 @@ GET    /goals/{id}/roadmap
 4. Resource recommendations
 5. Check-in responses
 6. Roadmap rescheduling
+7. Verification test generation
+8. Adaptive difficulty adjustment based on test performance
 
 ---
 
@@ -519,6 +662,9 @@ doit/
 5. **PhoneInputField** - With country code
 6. **CardView** - Rounded container
 7. **TabBarView** - Custom bottom navigation
+8. **QuizQuestionView** - Single question display with options
+9. **QuizProgressView** - Progress indicator for verification test
+10. **QuizResultView** - Score display with feedback
 
 ---
 
@@ -531,6 +677,9 @@ doit/
 | Goal Completion Rate | % goals reaching 100% |
 | Group Engagement | Messages per user per week |
 | NPS Score | User satisfaction |
+| Verification Pass Rate | % users passing daily verification tests |
+| Average Verification Score | Mean score across all verification tests |
+| Perfect Score Streak | Consecutive days with 100% verification scores |
 
 ---
 
@@ -543,6 +692,8 @@ doit/
 | Spam in groups | Moderation, report system, rate limiting |
 | Data privacy concerns | Minimal data collection, clear privacy policy |
 | Gemini API costs | Caching, rate limiting, tiered usage |
+| Verification test difficulty | Adaptive difficulty, retry options, manual review |
+| User frustration with tests | Optional review mode, clear explanations, gamification |
 
 ---
 
@@ -550,13 +701,14 @@ doit/
 
 | App | Strengths | Weaknesses | DoIt Advantage |
 |-----|-----------|------------|----------------|
-| Habitica | Gamification | Complex, gaming-focused | Simplicity, AI roadmaps |
-| Todoist | Task management | No AI, no community | AI-generated plans |
-| Streaks | Streak tracking | Limited to habits | Full goal journeys |
-| Forest | Focus timer | Single purpose | Comprehensive goals |
-| Strides | Goal tracking | No AI planning | AI research & roadmaps |
+| Habitica | Gamification | Complex, gaming-focused | Simplicity, AI roadmaps, verification tests |
+| Todoist | Task management | No AI, no community | AI-generated plans, task verification |
+| Streaks | Streak tracking | Limited to habits | Full goal journeys, learning validation |
+| Forest | Focus timer | Single purpose | Comprehensive goals, verification system |
+| Strides | Goal tracking | No AI planning | AI research & roadmaps, daily verification |
 
 ---
 
-*Document Version: 1.0*
+*Document Version: 1.1*
 *Created: January 12, 2026*
+*Updated: February 7, 2026 - Added Daily Task Verification System*
